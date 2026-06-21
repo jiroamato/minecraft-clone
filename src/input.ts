@@ -20,6 +20,9 @@ export class Input {
 
   locked = false;
   onLockChange: (locked: boolean) => void = () => {};
+  // Fired when requestPointerLock() is rejected (e.g. Chrome's post-Esc
+  // cooldown). Lets the UI recover instead of getting stuck unlocked.
+  onLockError: () => void = () => {};
 
   private el: HTMLElement;
   private now = 0;
@@ -89,6 +92,8 @@ export class Input {
       }
       this.onLockChange(this.locked);
     });
+
+    document.addEventListener('pointerlockerror', () => this.onLockError());
   }
 
   requestLock(): void {

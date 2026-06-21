@@ -80,10 +80,6 @@ export function itemKey(item: Item): string {
   return item.kind === 'block' ? `b:${item.block}` : `t:${item.tool}:${item.tier}`;
 }
 
-export function itemsEqual(a: Item, b: Item): boolean {
-  return itemKey(a) === itemKey(b);
-}
-
 /**
  * Seconds to break a block while holding `item`, per the vanilla formula:
  *   time = hardness * (canHarvest ? 1.5 : 5) / speedMultiplier

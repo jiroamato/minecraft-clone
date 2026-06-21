@@ -73,6 +73,13 @@ input.onLockChange = (locked) => {
   }
   overlayEl.classList.toggle('hidden', locked);
 };
+input.onLockError = () => {
+  // A re-lock was rejected (e.g. closing the picker during Chrome's post-Esc
+  // cooldown). Never leave the game stuck unlocked with no UI: close the picker
+  // and show the start overlay so a fresh click can re-enter.
+  picker.close();
+  overlayEl.classList.remove('hidden');
+};
 
 // --- creative item picker (E) ---
 function openPicker() {

@@ -486,9 +486,12 @@ function genToolSprite(toolType: ToolType, tier: Tier): Tile {
   return t;
 }
 
+// Cache key shared by the sprite-canvas and held-texture caches.
+const toolCacheKey = (toolType: ToolType, tier: Tier) => toolType + ':' + tier;
+
 const toolSpriteCache = new Map<string, HTMLCanvasElement>();
 function toolSpriteCanvas(toolType: ToolType, tier: Tier): HTMLCanvasElement {
-  const k = toolType + ':' + tier;
+  const k = toolCacheKey(toolType, tier);
   let cv = toolSpriteCache.get(k);
   if (!cv) {
     cv = genToolSprite(toolType, tier).toCanvas();
@@ -511,7 +514,7 @@ export function makeToolIcon(toolType: ToolType, tier: Tier, size = 64): HTMLCan
 const toolTexCache = new Map<string, THREE.CanvasTexture>();
 /** Nearest-filtered, transparent texture of a tool sprite for the held plane. */
 export function makeToolTexture(toolType: ToolType, tier: Tier): THREE.CanvasTexture {
-  const k = toolType + ':' + tier;
+  const k = toolCacheKey(toolType, tier);
   let tex = toolTexCache.get(k);
   if (!tex) {
     tex = new THREE.CanvasTexture(toolSpriteCanvas(toolType, tier));
