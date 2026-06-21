@@ -3,8 +3,8 @@
 // isometric block icons, and the F3-style debug overlay.
 // ---------------------------------------------------------------------------
 
-import { HOTBAR_BLOCKS } from './blocks';
-import { makeBlockIcon } from './textures';
+import { Item, defaultHotbar } from './items';
+import { makeItemIcon } from './textures';
 
 export interface DebugInfo {
   fps: number;
@@ -24,6 +24,9 @@ export class UI {
   private debugEl = document.getElementById('debug')!;
   private fpsEl = document.getElementById('fps')!;
   private slots: HTMLElement[] = [];
+  private tiles: HTMLCanvasElement[] = [];
+  /** The 9 hotbar items. Defaults to the placeable blocks; the picker swaps in tools. */
+  hotbar: Item[] = defaultHotbar();
   selected = 0;
   debugVisible = false;
 
@@ -33,29 +36,46 @@ export class UI {
   }
 
   buildHotbar(tiles: HTMLCanvasElement[]): void {
+    this.tiles = tiles;
     this.hotbarEl.innerHTML = '';
     this.slots = [];
-    HOTBAR_BLOCKS.forEach((blockId, i) => {
+    this.hotbar.forEach((_item, i) => {
       const slot = document.createElement('div');
       slot.className = 'slot' + (i === this.selected ? ' selected' : '');
-      const icon = makeBlockIcon(blockId, tiles, 64);
-      slot.appendChild(icon);
       const num = document.createElement('span');
       num.className = 'num';
       num.textContent = String(i + 1);
       slot.appendChild(num);
       this.hotbarEl.appendChild(slot);
       this.slots.push(slot);
+      this.renderSlotIcon(i);
     });
   }
 
+  /** (Re)draw a single slot's icon from its current item. */
+  private renderSlotIcon(i: number): void {
+    const slot = this.slots[i];
+    if (!slot) return;
+    slot.querySelector('canvas')?.remove();
+    const icon = makeItemIcon(this.hotbar[i], this.tiles, 64);
+    slot.insertBefore(icon, slot.firstChild);
+  }
+
+  /** Replace the item in a slot (used by the creative picker). */
+  setSlotItem(i: number, item: Item): void {
+    if (i < 0 || i >= this.hotbar.length) return;
+    this.hotbar[i] = item;
+    this.renderSlotIcon(i);
+  }
+
   setSelected(i: number): void {
-    this.selected = ((i % HOTBAR_BLOCKS.length) + HOTBAR_BLOCKS.length) % HOTBAR_BLOCKS.length;
+    const n = this.hotbar.length;
+    this.selected = ((i % n) + n) % n;
     this.slots.forEach((s, idx) => s.classList.toggle('selected', idx === this.selected));
   }
 
-  get selectedBlock(): number {
-    return HOTBAR_BLOCKS[this.selected];
+  get selectedItem(): Item {
+    return this.hotbar[this.selected];
   }
 
   toggleDebug(): void {

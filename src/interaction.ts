@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import type { World } from './world';
 import { Player } from './player';
 import { Input } from './input';
-import { Blocks, BlockId, blockDef } from './blocks';
+import { Blocks, blockDef } from './blocks';
+import { Item, breakSeconds } from './items';
 
 const REACH = 4.5;
 
@@ -167,7 +168,7 @@ export class Interaction {
   }
 
   /** Returns true if the player swung (broke or placed) this frame. */
-  update(dt: number, input: Input, player: Player, world: World, selected: BlockId): boolean {
+  update(dt: number, input: Input, player: Player, world: World, selected: Item): boolean {
     const origin = player.eyePosition;
     const dir = player.getLookDir();
     const hit = raycast(world, origin, dir);
@@ -191,14 +192,16 @@ export class Interaction {
     const key = hit.x + ',' + hit.y + ',' + hit.z;
     const id = world.getBlock(hit.x, hit.y, hit.z);
     const def = blockDef(id);
+    // Break time depends on the held item: correct tool + tier mine far faster.
+    const breakT = breakSeconds(def, selected);
 
-    if (input.leftHeld && def.breakTime !== Infinity) {
+    if (input.leftHeld && Number.isFinite(breakT)) {
       if (this.breakingKey !== key) {
         this.breakingKey = key;
         this.breakAccum = 0;
       }
       this.breakAccum += dt;
-      this.breakProgress = Math.min(1, this.breakAccum / def.breakTime);
+      this.breakProgress = Math.min(1, this.breakAccum / breakT);
       const stage = Math.min(9, Math.floor(this.breakProgress * 10));
       this.crack.visible = true;
       this.crack.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
@@ -223,16 +226,18 @@ export class Interaction {
     // continuous swing while holding to break
     if (input.leftHeld) swung = true;
 
-    // --- placing (right-click) ---
+    // --- placing (right-click) --- only blocks place; tools just swing.
     if (input.rightJustPressed) {
-      const px = hit.x + hit.nx;
-      const py = hit.y + hit.ny;
-      const pz = hit.z + hit.nz;
-      const targetId = world.getBlock(px, py, pz);
-      const targetDef = blockDef(targetId);
-      const replaceable = targetId === Blocks.AIR || targetDef.liquid;
-      if (replaceable && !(blockDef(selected).solid && this.intersectsPlayer(px, py, pz, player))) {
-        world.setBlock(px, py, pz, selected);
+      if (selected.kind === 'block') {
+        const px = hit.x + hit.nx;
+        const py = hit.y + hit.ny;
+        const pz = hit.z + hit.nz;
+        const targetId = world.getBlock(px, py, pz);
+        const targetDef = blockDef(targetId);
+        const replaceable = targetId === Blocks.AIR || targetDef.liquid;
+        if (replaceable && !(blockDef(selected.block).solid && this.intersectsPlayer(px, py, pz, player))) {
+          world.setBlock(px, py, pz, selected.block);
+        }
       }
       swung = true;
     }

@@ -8,8 +8,9 @@
 // ---------------------------------------------------------------------------
 
 import * as THREE from 'three';
-import { TILE_COUNT } from './blocks';
+import { TILE_COUNT, ToolType } from './blocks';
 import { blockDef, BlockId } from './blocks';
+import { Tier, Item } from './items';
 
 export const TILE_RES = 16;
 
@@ -440,4 +441,93 @@ export function makeBlockIcon(blockId: BlockId, tiles: HTMLCanvasElement[], size
   void R2;
 
   return cv;
+}
+
+// ---------------------------------------------------------------------------
+// Tool sprites: procedural 16x16 flat item icons (transparent background). A
+// shared brown stick plus a per-tool head shape, recoloured per material tier.
+// Used both as upscaled HUD icons and as the texture on the held tool plane.
+// ---------------------------------------------------------------------------
+
+const STICK: RGBA = [110, 78, 46, 255];
+
+// Head fill colour per material tier.
+const TIER_HEAD: Record<Tier, RGBA> = {
+  [Tier.Wood]: [143, 101, 56, 255],
+  [Tier.Stone]: [130, 130, 130, 255],
+  [Tier.Iron]: [216, 216, 216, 255],
+  [Tier.Gold]: [250, 213, 79, 255],
+  [Tier.Diamond]: [80, 217, 211, 255],
+  [Tier.Netherite]: [77, 70, 76, 255],
+};
+
+// Head pixels per tool, in the top-right quadrant where the stick ends. Each is
+// a distinct, readable silhouette at 16x16.
+const HEAD_PIXELS: Record<ToolType, [number, number][]> = {
+  [ToolType.Pickaxe]: [[9, 4], [10, 3], [11, 2], [12, 2], [13, 3], [14, 4], [10, 4], [11, 3], [12, 3], [13, 4]],
+  [ToolType.Axe]: [[12, 2], [13, 2], [14, 2], [12, 3], [13, 3], [14, 3], [12, 4], [13, 4], [14, 4], [13, 5], [14, 5]],
+  [ToolType.Shovel]: [[10, 1], [11, 1], [12, 1], [10, 2], [11, 2], [12, 2], [10, 3], [11, 3], [12, 3], [11, 4]],
+  [ToolType.Hoe]: [[10, 2], [11, 2], [12, 2], [13, 2], [14, 2], [10, 3]],
+};
+
+function genToolSprite(toolType: ToolType, tier: Tier): Tile {
+  const t = new Tile();
+  const r = rng((toolType + 1) * 131 + (tier + 1) * 17);
+  // handle: a 2px-thick diagonal stick from lower-left up to the head
+  for (let i = 0; i < 9; i++) {
+    const x = 3 + i;
+    const y = 13 - i;
+    t.set(x, y, shade(STICK, (r() - 0.5) * 12));
+    t.set(x + 1, y, shade(STICK, (r() - 0.5) * 12 - 6));
+  }
+  // head
+  const head = TIER_HEAD[tier];
+  for (const [x, y] of HEAD_PIXELS[toolType]) t.set(x, y, shade(head, (r() - 0.5) * 22));
+  return t;
+}
+
+const toolSpriteCache = new Map<string, HTMLCanvasElement>();
+function toolSpriteCanvas(toolType: ToolType, tier: Tier): HTMLCanvasElement {
+  const k = toolType + ':' + tier;
+  let cv = toolSpriteCache.get(k);
+  if (!cv) {
+    cv = genToolSprite(toolType, tier).toCanvas();
+    toolSpriteCache.set(k, cv);
+  }
+  return cv;
+}
+
+/** Upscaled flat tool icon for the hotbar / picker. */
+export function makeToolIcon(toolType: ToolType, tier: Tier, size = 64): HTMLCanvasElement {
+  const cv = document.createElement('canvas');
+  cv.width = size;
+  cv.height = size;
+  const ctx = cv.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(toolSpriteCanvas(toolType, tier), 0, 0, TILE_RES, TILE_RES, 0, 0, size, size);
+  return cv;
+}
+
+const toolTexCache = new Map<string, THREE.CanvasTexture>();
+/** Nearest-filtered, transparent texture of a tool sprite for the held plane. */
+export function makeToolTexture(toolType: ToolType, tier: Tier): THREE.CanvasTexture {
+  const k = toolType + ':' + tier;
+  let tex = toolTexCache.get(k);
+  if (!tex) {
+    tex = new THREE.CanvasTexture(toolSpriteCanvas(toolType, tier));
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    toolTexCache.set(k, tex);
+  }
+  return tex;
+}
+
+/** Icon for any hotbar/picker item: block iso-icon or flat tool sprite. */
+export function makeItemIcon(item: Item, tiles: HTMLCanvasElement[], size = 64): HTMLCanvasElement {
+  return item.kind === 'block'
+    ? makeBlockIcon(item.block, tiles, size)
+    : makeToolIcon(item.tool, item.tier, size);
 }

@@ -97,6 +97,33 @@
       #loading { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center;
         justify-content: center; background: #87aef0; color: #fff; font-size: 20px; }
       #loading.hidden { display: none; }
+
+      /* Creative item picker (E) */
+      #picker {
+        position: fixed; inset: 0; z-index: 25;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(10, 20, 40, 0.55); backdrop-filter: blur(2px);
+      }
+      #picker.hidden { display: none; }
+      #picker .panel {
+        background: rgba(0, 0, 0, 0.6); border: 2px solid #2b2b2b; border-radius: 4px;
+        padding: 14px 16px; max-width: 86vw;
+      }
+      #pickerTitle {
+        color: #fff; font-size: 13px; text-align: center; margin-bottom: 10px;
+        text-shadow: 1px 1px 0 #000;
+      }
+      #pickerGrid {
+        display: grid; grid-template-columns: repeat(9, 52px); gap: 4px;
+        max-height: 70vh; overflow-y: auto; image-rendering: pixelated;
+      }
+      .pcell {
+        width: 52px; height: 52px; padding: 0; cursor: pointer;
+        background: #8b8b8b; border: 2px solid; border-color: #373737 #ffffff #ffffff #373737;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .pcell:hover { outline: 2px solid #ffffff; outline-offset: 1px; }
+      .pcell canvas { width: 80%; height: 80%; image-rendering: pixelated; }
     </style>
   </head>
   <body>
@@ -111,13 +138,20 @@
 
     <div id="loading">Generating world…</div>
 
+    <div id="picker" class="hidden">
+      <div class="panel">
+        <div id="pickerTitle"></div>
+        <div id="pickerGrid"></div>
+      </div>
+    </div>
+
     <div id="overlay" class="hidden">
       <h1>VIBELAND</h1>
       <p>A from-scratch Minecraft-style voxel game.</p>
       <button class="play" id="play">Click to Play</button>
       <div class="controls">
         WASD move · Space jump · Shift sneak · Ctrl / double-tap W sprint · F fly<br />
-        Left-click break · Right-click place · 1–9 / scroll select · F3 debug · Esc release mouse
+        Left-click break · Right-click place · 1–9 / scroll select · E items · F3 debug · Esc release mouse
       </div>
       <div class="pack">
         <input type="file" id="packInput" webkitdirectory directory multiple />

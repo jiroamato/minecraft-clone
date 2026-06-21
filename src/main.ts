@@ -11,6 +11,7 @@ import { Sky } from './sky';
 import { HeldItem } from './held';
 import { UI } from './ui';
 import { Interaction } from './interaction';
+import { Picker } from './picker';
 import { ChunkManager } from './chunkManager';
 import { makeChunkMaterials } from './chunkMaterial';
 import { generateDefaultTiles, buildAtlas, paintAtlas } from './textures';
@@ -45,7 +46,15 @@ const input = new Input(renderer.domElement);
 const chunks = new ChunkManager(world, scene, materials);
 
 ui.buildHotbar(tiles);
-held.setBlock(ui.selectedBlock);
+const picker = new Picker(tiles);
+held.setItem(ui.selectedItem);
+
+// picker → hotbar wiring
+picker.onSlotChange = (slot) => ui.setSelected(slot);
+picker.onPick = (slot, item) => {
+  ui.setSlotItem(slot, item);
+  held.setItem(ui.selectedItem);
+};
 
 // spawn the player above the surface near origin
 player.spawn(0, 0);
@@ -56,8 +65,36 @@ const loadingEl = document.getElementById('loading')!;
 const playBtn = document.getElementById('play')!;
 playBtn.addEventListener('click', () => input.requestLock());
 input.onLockChange = (locked) => {
+  // While the picker is open the pointer is intentionally released; keep the
+  // start overlay hidden so it doesn't pop up behind the picker.
+  if (picker.open) {
+    overlayEl.classList.add('hidden');
+    return;
+  }
   overlayEl.classList.toggle('hidden', locked);
 };
+
+// --- creative item picker (E) ---
+function openPicker() {
+  if (!started || picker.open || !input.locked) return;
+  picker.show(ui.selected); // releases the pointer; onLockChange keeps overlay hidden
+  document.exitPointerLock();
+}
+function closePicker() {
+  if (!picker.open) return;
+  picker.close();
+  input.requestLock(); // gesture-safe: called from the keydown handler below
+}
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'KeyE') {
+    if (!started) return;
+    e.preventDefault();
+    if (picker.open) closePicker();
+    else openPicker();
+  } else if (e.code === 'Escape' && picker.open) {
+    closePicker();
+  }
+});
 
 // --- resource pack ---
 const packInput = document.getElementById('packInput') as HTMLInputElement;
@@ -69,6 +106,7 @@ packInput.addEventListener('change', async () => {
   paintAtlas(atlasCanvas, tiles);
   atlasTexture.needsUpdate = true;
   ui.buildHotbar(tiles);
+  picker.build(tiles);
   packStatus.textContent = ` ${res.replaced}/${res.total} textures applied`;
 });
 
@@ -95,7 +133,7 @@ function selectFromInput() {
   for (let i = 1; i <= 9; i++) if (input.wasPressed('Digit' + i)) ui.setSelected(i - 1);
   const w = input.consumeWheel();
   if (w !== 0) ui.setSelected(ui.selected + w);
-  held.setBlock(ui.selectedBlock);
+  held.setItem(ui.selectedItem);
 }
 
 function frame(now: number) {
@@ -135,7 +173,7 @@ function frame(now: number) {
   let swung = false;
   if (started && input.locked) {
     player.update(dt, input);
-    swung = interaction.update(dt, input, player, world, ui.selectedBlock);
+    swung = interaction.update(dt, input, player, world, ui.selectedItem);
   } else {
     // keep camera oriented even while paused
     player.camera.rotation.y = player.yaw;
@@ -172,4 +210,4 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 // Debug handle (handy in the console: e.g. __game.player.pos, __game.sky.time).
-(window as any).__game = { player, world, input, interaction, ui, chunks, sky, renderer, held };
+(window as any).__game = { player, world, input, interaction, ui, picker, chunks, sky, renderer, held };
