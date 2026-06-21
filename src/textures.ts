@@ -449,40 +449,82 @@ export function makeBlockIcon(blockId: BlockId, tiles: HTMLCanvasElement[], size
 // Used both as upscaled HUD icons and as the texture on the held tool plane.
 // ---------------------------------------------------------------------------
 
-const STICK: RGBA = [110, 78, 46, 255];
+interface Palette {
+  outline: RGBA; // shadow side (bottom/right edges)
+  base: RGBA; // interior
+  light: RGBA; // lit side (top/left edges)
+  dark: RGBA; // handle shadow column
+}
 
-// Head fill colour per material tier.
-const TIER_HEAD: Record<Tier, RGBA> = {
-  [Tier.Wood]: [143, 101, 56, 255],
-  [Tier.Stone]: [130, 130, 130, 255],
-  [Tier.Iron]: [216, 216, 216, 255],
-  [Tier.Gold]: [250, 213, 79, 255],
-  [Tier.Diamond]: [80, 217, 211, 255],
-  [Tier.Netherite]: [77, 70, 76, 255],
+const HANDLE_PAL: Palette = {
+  outline: [60, 42, 24, 255],
+  base: [122, 88, 52, 255],
+  light: [150, 112, 70, 255],
+  dark: [92, 64, 36, 255],
 };
 
-// Head pixels per tool, in the top-right quadrant where the stick ends. Each is
-// a distinct, readable silhouette at 16x16.
-const HEAD_PIXELS: Record<ToolType, [number, number][]> = {
-  [ToolType.Pickaxe]: [[9, 4], [10, 3], [11, 2], [12, 2], [13, 3], [14, 4], [10, 4], [11, 3], [12, 3], [13, 4]],
-  [ToolType.Axe]: [[12, 2], [13, 2], [14, 2], [12, 3], [13, 3], [14, 3], [12, 4], [13, 4], [14, 4], [13, 5], [14, 5]],
-  [ToolType.Shovel]: [[10, 1], [11, 1], [12, 1], [10, 2], [11, 2], [12, 2], [10, 3], [11, 3], [12, 3], [11, 4]],
-  [ToolType.Hoe]: [[10, 2], [11, 2], [12, 2], [13, 2], [14, 2], [10, 3]],
+// Material tier palette for tool heads.
+const TIER_PAL: Record<Tier, Palette> = {
+  [Tier.Wood]: { outline: [78, 54, 28, 255], base: [152, 110, 64, 255], light: [184, 144, 96, 255], dark: [120, 84, 46, 255] },
+  [Tier.Stone]: { outline: [56, 56, 56, 255], base: [126, 126, 126, 255], light: [162, 162, 162, 255], dark: [96, 96, 96, 255] },
+  [Tier.Iron]: { outline: [120, 120, 120, 255], base: [214, 214, 214, 255], light: [244, 244, 244, 255], dark: [178, 178, 178, 255] },
+  [Tier.Gold]: { outline: [150, 108, 22, 255], base: [248, 208, 62, 255], light: [255, 240, 154, 255], dark: [210, 162, 32, 255] },
+  [Tier.Diamond]: { outline: [40, 140, 134, 255], base: [98, 224, 214, 255], light: [172, 248, 240, 255], dark: [56, 188, 178, 255] },
+  [Tier.Netherite]: { outline: [22, 16, 20, 255], base: [82, 72, 80, 255], light: [116, 104, 114, 255], dark: [52, 44, 52, 255] },
 };
+
+// Rows of [y, x0, x1] inclusive ranges → flat list of [x, y] pixels.
+function rangesToPts(rows: [number, number, number][]): [number, number][] {
+  const pts: [number, number][] = [];
+  for (const [y, x0, x1] of rows) for (let x = x0; x <= x1; x++) pts.push([x, y]);
+  return pts;
+}
+
+// Filled head silhouettes per tool (16x16), drawn in the upper-right where the
+// shared handle ends near (8,7). Auto-shading turns each into pixel art.
+const HEADS: Record<ToolType, [number, number][]> = {
+  // wide head bar with two down-tips and a central neck to the handle
+  [ToolType.Pickaxe]: [
+    ...rangesToPts([[2, 4, 12], [3, 3, 13]]),
+    [3, 4], [13, 4], // tips
+    ...rangesToPts([[4, 8, 9], [5, 8, 9], [6, 8, 9]]), // neck
+  ],
+  // chunky blade to the right of the handle top
+  [ToolType.Axe]: rangesToPts([[2, 10, 12], [3, 9, 13], [4, 9, 13], [5, 9, 12], [6, 9, 10]]),
+  // rounded spade blade above the handle
+  [ToolType.Shovel]: rangesToPts([[1, 7, 9], [2, 6, 10], [3, 6, 10], [4, 6, 10], [5, 7, 9], [6, 8, 9]]),
+  // top bar with a short downward flange (the classic hoe L)
+  [ToolType.Hoe]: rangesToPts([[2, 8, 13], [3, 8, 13], [4, 8, 9], [5, 8, 9], [6, 8, 9]]),
+};
+
+// The shared wooden handle: a 2px diagonal stick, lit on its upper-left column
+// and shaded on its lower-right column.
+function drawHandle(t: Tile): void {
+  for (let s = 0; s <= 6; s++) {
+    const x = 2 + s;
+    const y = 13 - s;
+    t.set(x, y, HANDLE_PAL.base);
+    t.set(x + 1, y, HANDLE_PAL.dark);
+  }
+  t.set(2, 13, HANDLE_PAL.outline); // grounded bottom tip
+}
+
+// Directional shading: bottom/right edges → outline (shadow), top/left edges →
+// light, fully-enclosed pixels → base. Gives flat silhouettes a 3D read.
+function drawShadedMask(t: Tile, pts: [number, number][], pal: Palette): void {
+  const set = new Set(pts.map(([x, y]) => x + ',' + y));
+  const has = (x: number, y: number) => set.has(x + ',' + y);
+  for (const [x, y] of pts) {
+    const shadow = !has(x, y + 1) || !has(x + 1, y);
+    const lit = !has(x, y - 1) || !has(x - 1, y);
+    t.set(x, y, shadow ? pal.outline : lit ? pal.light : pal.base);
+  }
+}
 
 function genToolSprite(toolType: ToolType, tier: Tier): Tile {
   const t = new Tile();
-  const r = rng((toolType + 1) * 131 + (tier + 1) * 17);
-  // handle: a 2px-thick diagonal stick from lower-left up to the head
-  for (let i = 0; i < 9; i++) {
-    const x = 3 + i;
-    const y = 13 - i;
-    t.set(x, y, shade(STICK, (r() - 0.5) * 12));
-    t.set(x + 1, y, shade(STICK, (r() - 0.5) * 12 - 6));
-  }
-  // head
-  const head = TIER_HEAD[tier];
-  for (const [x, y] of HEAD_PIXELS[toolType]) t.set(x, y, shade(head, (r() - 0.5) * 22));
+  drawHandle(t); // handle first…
+  drawShadedMask(t, HEADS[toolType], TIER_PAL[tier]); // …head drawn over its top
   return t;
 }
 
