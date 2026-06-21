@@ -22,9 +22,15 @@ export interface DebugInfo {
 export class UI {
   private hotbarEl = document.getElementById('hotbar')!;
   private debugEl = document.getElementById('debug')!;
+  private fpsEl = document.getElementById('fps')!;
   private slots: HTMLElement[] = [];
   selected = 0;
   debugVisible = false;
+
+  /** Update the always-on top-left FPS counter. */
+  updateFps(fps: number): void {
+    this.fpsEl.textContent = fps + ' fps';
+  }
 
   buildHotbar(tiles: HTMLCanvasElement[]): void {
     this.hotbarEl.innerHTML = '';
@@ -55,6 +61,8 @@ export class UI {
   toggleDebug(): void {
     this.debugVisible = !this.debugVisible;
     this.debugEl.classList.toggle('visible', this.debugVisible);
+    // the F3 overlay reports FPS itself, so hide the standalone counter then
+    this.fpsEl.classList.toggle('hidden', this.debugVisible);
   }
 
   updateDebug(d: DebugInfo): void {

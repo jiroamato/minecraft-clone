@@ -53,6 +53,16 @@
         font-size: 11px; color: #fff; text-shadow: 1px 1px 0 #3f3f3f;
       }
 
+      /* Always-on FPS counter (top-left). Hidden while the F3 overlay is up,
+         since that overlay already reports FPS. */
+      #fps {
+        position: absolute; top: 6px; left: 6px;
+        font-family: "Consolas", "Courier New", monospace;
+        font-size: 14px; color: #fff;
+        text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000;
+      }
+      #fps.hidden { display: none; }
+
       /* Debug overlay (F3) */
       #debug {
         position: absolute; top: 6px; left: 6px;
@@ -94,6 +104,7 @@
 
     <div id="hud">
       <div id="crosshair"></div>
+      <div id="fps">— fps</div>
       <div id="debug"></div>
       <div id="hotbar"></div>
     </div>

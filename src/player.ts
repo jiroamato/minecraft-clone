@@ -153,12 +153,12 @@ export class Player {
     const back = input.isDown('KeyS') ? 1 : 0;
     const left = input.isDown('KeyA') ? 1 : 0;
     const right = input.isDown('KeyD') ? 1 : 0;
-    let ix = right - left;
-    let iz = back - forward;
-    const len = Math.hypot(ix, iz);
+    let fwd = forward - back; // W = +1 (toward where you look)
+    let strafe = right - left; // D = +1
+    const len = Math.hypot(fwd, strafe);
     if (len > 0) {
-      ix /= len;
-      iz /= len;
+      fwd /= len;
+      strafe /= len;
     }
 
     // sprint logic
@@ -172,11 +172,12 @@ export class Player {
     else if (this.sprinting) speed = SPRINT;
     else speed = WALK;
 
-    // rotate input by yaw
+    // Rotate input into world space using the camera's actual basis at this yaw:
+    //   forward = (-sin, -cos),  right = (cos, -sin)   (x, z)
     const sin = Math.sin(this.yaw);
     const cos = Math.cos(this.yaw);
-    const wishX = ix * cos - iz * sin;
-    const wishZ = ix * sin + iz * cos;
+    const wishX = strafe * cos - fwd * sin;
+    const wishZ = -strafe * sin - fwd * cos;
 
     const targetVX = wishX * speed;
     const targetVZ = wishZ * speed;

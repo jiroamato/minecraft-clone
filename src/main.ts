@@ -110,6 +110,7 @@ function frame(now: number) {
     fps = Math.round(fpsFrames / fpsAccum);
     fpsAccum = 0;
     fpsFrames = 0;
+    ui.updateFps(fps);
   }
 
   if (input.wasPressed('F3')) ui.toggleDebug();
